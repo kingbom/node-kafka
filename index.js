@@ -1,23 +1,34 @@
-const { Kafka } = require('kafkajs');
-const express = require('express')
+const { Kafka, CompressionTypes, Partitioners } = require('kafkajs');
+const express = require('express');
+const { v4: uuid } = require('uuid');
 const app = express();
 app.use(express.json())
 
 const kafka = new Kafka({
     clientId: 'node-kafka',
-    brokers: ['localhost:9092']
+    brokers: ['localhost:9092'],
+    connectionTimeout: 3000,
+    retry: {
+      initialRetryTime: 300,
+      retries: 3
+    }
  });
 
-const producer = kafka.producer();
+const producer = kafka.producer({ createPartitioner: Partitioners.JavaCompatiblePartitioner });
 
 
 app.post('/producer', async (req, res) => {
     const { body } = req;
     await producer.connect();
-
     const producerResult = await producer.send({
         topic: 'order',
-        messages: [{ value : JSON.stringify(body) },],
+        compression: CompressionTypes.GZIP,
+        messages: [
+          { 
+            headers: { 'correlation-id': uuid() },
+            value : JSON.stringify(body) 
+          },
+        ],
     })
 
 
